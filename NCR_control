@@ -1,0 +1,1004 @@
+EstaPasta_de_trabalho - 1
+Option Explicit
+Public NoEvents As Boolean
+Private Sub Workbook_BeforeClose(Cancel As Boolean)
+
+ ThisWorkbook.Saved = True
+
+ If NoEvents Then Exit Sub
+
+ MsgBox "Para fechar utilize o Botão FECHAR ARQUIVO!", vbInformation + vbOKOnly
+
+ Cancel = True
+
+End Sub
+Módulo1 - 1
+Public Sub Auto_Open()
+
+ Application.DisplayAlerts = False
+
+ Call Unprotect
+
+ Sheets("lista").Visible = True
+ Sheets("lista").Select
+
+ If ActiveWorkbook.ReadOnly = True Then
+
+ Dim editor As String
+ editor = Range("c1").Value
+
+ MsgBox "ARQUIVO É SOMENTE LEITURA. LISTA DE RNC PODE ESTAR DESATUALIZADA"
+ Range("C5").Value = "PLANILHA PARA EDIÇÃO ABERTA POR " & editor
+ Range("c2").Value = Application.UserName
+
+ Else: Call atualiza_dados
+
+ End If
+
+ Call protect
+
+End Sub
+Sub protect()
+ 'Bloquear planilha
+
+ ActiveWorkbook.protect ("PJ")
+ ActiveSheet.protect Password:="PJ", DrawingObjects:=True, Contents:=True, Scenarios:=True _
+ , AllowSorting:=True, AllowFiltering:=True
+End Sub
+Sub Unprotect()
+ 'Desbloquear planilha
+
+ ActiveWorkbook.Unprotect ("PJ")
+ ActiveSheet.Unprotect ("PJ")
+End Sub
+
+Sub atualiza_dados()
+'atualiza nome do editor
+ Range("c1").Value = Application.UserName
+ Range("c5").ClearContents
+ ActiveWorkbook.Save
+'
+'Abre arquivo "Banco dados RNC"
+ Dim planilha As Object
+ On Error GoTo ErrMsg2
+ Set planilha = Workbooks.Open("J:\Qua- RNC\Sistema RNC\Banco dados RNC.xlsm")
+ Call Unprotect
+ Sheets("lista").Select
+
+' Seleciona linhas com dados para transferência e copia dados
+ Dim ultima
+ ultima = Range("A6").End(xlDown).Row
+ Range("A7:DB" & ultima).Select
+ Selection.Copy
+
+'Cola valores na próxima linha vazia na Lista de RNC,
+ Windows("Lista de RNC.xlsm").Activate
+ Range("A1048576").End(xlUp).Offset(1, 0).Select
+ Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
+ :=False, Transpose:=False
+ Application.CutCopyMode = False
+
+' aplica formatação original da planilha
+ Rows("7:7").Select
+ Selection.Copy
+ Rows("1048576").End(xlUp).Offset(-10, 0).EntireRow.Select
+ Range(Selection, Selection.End(xlDown)).EntireRow.Select
+ Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+ SkipBlanks:=False, Transpose:=False
+Módulo1 - 2
+ Application.CutCopyMode = False
+
+' coloca dados em ordem decrescente, limpa células vazia das causas fundamentais e salva
+
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Clear
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Add Key:=Range( _
+ "A6"), SortOn:=xlSortOnValues, Order:=xlDescending, DataOption:= _
+ xlSortNormal
+ With ActiveWorkbook.Worksheets("lista").AutoFilter.Sort
+ .Header = xlYes
+ .MatchCase = False
+ .Orientation = xlTopToBottom
+ .SortMethod = xlPinYin
+ .Apply
+ End With
+ Call cel_vazia
+
+ ActiveWorkbook.Save
+'anota o número do último RNC no Banco dados RNC, limpa dados, salva e fecha
+ Windows("Banco dados RNC.xlsm").Activate
+ Range("a7:db100").ClearContents
+ Call protect
+ ActiveWorkbook.Close savechanges:=True
+
+ Windows("Lista de RNC.xlsm").Activate
+ Sheets("lista").Select
+ Range("a7").Select
+
+
+Exit Sub
+ErrMsg2:
+ MsgBox ("NÃO HÁ DADOS NOVOS PARA SEREM ATUALIZADOS.")
+
+ Range("a7").Select
+
+ Windows("Banco dados RNC.xlsm").Activate
+ ActiveWorkbook.Close savechanges:=False
+End Sub
+Sub visualizar()
+' visualiza RNC
+ Call Unprotect
+ Sheets("lista").Select
+
+ Call LimpaFiltros
+ ' Limpa filtros ativos
+
+
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Clear
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Add Key:=Range( _
+ "A6"), SortOn:=xlSortOnValues, Order:=xlAscending, DataOption:= _
+ xlSortNormal
+ With ActiveWorkbook.Worksheets("lista").AutoFilter.Sort
+ .Header = xlYes
+ .MatchCase = False
+ .Orientation = xlTopToBottom
+ .SortMethod = xlPinYin
+ .Apply
+ End With
+
+ Sheets("RNC1").Visible = True
+
+ Call AbrirPDF
+
+ Sheets("RNC1").Visible = False
+ Sheets("lista").Select
+Módulo1 - 3
+'retorna planilha para ordem decrescente
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Clear
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Add Key:=Range( _
+ "A6"), SortOn:=xlSortOnValues, Order:=xlDescending, DataOption:= _
+ xlSortNormal
+ With ActiveWorkbook.Worksheets("lista").AutoFilter.Sort
+ .Header = xlYes
+ .MatchCase = False
+ .Orientation = xlTopToBottom
+ .SortMethod = xlPinYin
+ .Apply
+ End With
+
+ Call protect
+
+End Sub
+Sub SalvarPDF()
+'
+' Salvar RNC em pdf mas não abrir arquivo
+Dim NomeArq As String
+NomeArq = Range("D3").Value
+' Número RNC
+ Sheets("RNC1").Visible = True
+ Sheets("RNC1").Select
+ ActiveSheet.ExportAsFixedFormat Type:=xlTypePDF, Filename:="J:\Qua- RNC\Sistema RNC\RNC impresso\" & "RNC" & "_" & NomeArq _
+ , Quality:=xlQualityStandard, IncludeDocProperties:=True, IgnorePrintAreas:=False, _
+ OpenAfterPublish:=False
+ Sheets("RNC1").Visible = False
+
+End Sub
+Sub AbrirPDF()
+'
+' Salvar RNC em pdf e abrir arquivo para visualização
+Dim NomeArq As String
+NomeArq = Range("d3").Value
+' Número RNC
+
+ Sheets("RNC1").Select
+ ActiveSheet.ExportAsFixedFormat Type:=xlTypePDF, Filename:="J:\Qua- RNC\Sistema RNC\RNC impresso\" & "RNC" & "_" & NomeArq _
+ , Quality:=xlQualityStandard, IncludeDocProperties:=True, IgnorePrintAreas:=False, _
+ OpenAfterPublish:=True
+
+End Sub
+Sub cel_vazia()
+'
+' apagar conteúdo de célula que deveria estar vazia. Rotina necessária pois na coluna de causas fundamentais, a célula aparece vazia mas não está contando como vazia.
+''
+ ActiveSheet.Range("$A$6:$DC$2000").AutoFilter Field:=4, Criteria1:="="
+ Range("D7:D2000").Select
+ Selection.ClearContents
+ ActiveSheet.Range("$A$6:$DC$2000").AutoFilter Field:=4
+ Range("D26").Select
+End Sub
+Sub abre_revisoes()
+' abrir planilha de histórico de revisões
+ Call Unprotect
+ Sheets("Rev").Visible = True
+ Sheets("Rev").Select
+ Sheets("lista").Visible = False
+ Call protect
+End Sub
+Sub fecha_revisoes()
+Módulo1 - 4
+' fecha planilha de histórico de revisões
+
+ Call Unprotect
+ Sheets("lista").Visible = True
+ Sheets("lista").Select
+ Sheets("Rev").Visible = False
+ Call protect
+End Sub
+Sub impressao()
+Application.Dialogs(xlDialogPrint).Show
+End Sub
+Módulo2 - 1
+' Abre planilha de RNC para editar
+Sub analisa_edicao()
+ If ActiveWorkbook.ReadOnly = True Then
+
+ MsgBox "NÃO É POSSÍVEL EDITAR POIS ARQUIVO É SOMENTE LEITURA. FECHE O ARQUIVO E ABRA NOVAMENTE."
+
+ Else: Call abrir_editar
+ End If
+
+End Sub
+Sub LimpaFiltros()
+
+ ActiveSheet.Range("$A$6:$DC$2000").AutoFilter Field:=1
+ ActiveSheet.Range("$A$6:$DC$2000").AutoFilter Field:=2
+ ActiveSheet.Range("$A$6:$DC$2000").AutoFilter Field:=3
+ ActiveSheet.Range("$A$6:$DC$2000").AutoFilter Field:=4
+ ActiveSheet.Range("$A$6:$DC$2000").AutoFilter Field:=5
+ ActiveSheet.Range("$A$6:$DC$2000").AutoFilter Field:=6
+ ActiveSheet.Range("$A$6:$DC$2000").AutoFilter Field:=7
+ ActiveSheet.Range("$A$6:$DC$2000").AutoFilter Field:=8
+End Sub
+
+Sub libera_edit()
+' Senha para liberar alteração de destinatário
+ Senha2 = "PCP"
+ Resposta2 = InputBox("Insira a senha para liberar a alteração do Destinatário")
+ If Resposta2 <> Senha2 Then
+ MsgBox "Senha Incorreta", , "ACESSO NEGADO"
+ Exit Sub
+ Else
+ Call Unprotect
+ Range("D9:E9").Select
+ 'Range("B16:L16").Select
+ Selection.Locked = False
+ Selection.FormulaHidden = False
+ Call protect
+
+ End If
+
+
+
+End Sub
+Sub libera_desc_edit()
+' Senha para alteração de destinatário
+ Senha3 = "PCP"
+ Resposta3 = InputBox("Insira a senha para liberar a alteração do Destinatário")
+ If Resposta3 <> Senha3 Then
+ MsgBox "Senha Incorreta", , "ACESSO NEGADO"
+ Exit Sub
+ Else
+ Call Unprotect
+ Range("B16:L16").Select
+ Selection.Locked = False
+ Selection.FormulaHidden = False
+ Call protect
+
+Módulo2 - 2
+ End If
+
+
+
+End Sub
+
+Sub abrir_editar()
+ Call Unprotect
+ Sheets("lista").Select
+
+ Call LimpaFiltros
+ ' Limpa filtros ativos
+
+ ' Coloca RNC em ordem crescente
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Clear
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Add Key:=Range( _
+ "A6"), SortOn:=xlSortOnValues, Order:=xlAscending, DataOption:= _
+ xlSortNormal
+ With ActiveWorkbook.Worksheets("lista").AutoFilter.Sort
+ .Header = xlYes
+ .MatchCase = False
+ .Orientation = xlTopToBottom
+ .SortMethod = xlPinYin
+ .Apply
+ End With
+ Sheets("RNC2").Visible = True
+
+ Call colar_valores
+
+ Sheets("RNC2").Select
+ Range("D2:J5").Select
+
+ Sheets("lista").Visible = False
+
+ Call protect
+
+End Sub
+Sub colar_valores()
+' Cola valores da RNC 1 na planilha RNC 2 para edição
+
+ Sheets("RNC1").Visible = True
+ Sheets("RNC2").Range("L2:L3").Value = Sheets("RNC1").Range("L2:L3").Value
+ Sheets("RNC2").Range("K5:L5").Value = Sheets("RNC1").Range("K5:L5").Value
+ Sheets("RNC2").Range("D7:E9").Value = Sheets("RNC1").Range("D7:E9").Value
+ Sheets("RNC2").Range("G7:I8").Value = Sheets("RNC1").Range("G7:I8").Value
+ Sheets("RNC2").Range("K7:L8").Value = Sheets("RNC1").Range("K7:L8").Value
+ Sheets("RNC2").Range("D11:E12").Value = Sheets("RNC1").Range("D11:E12").Value
+ Sheets("RNC2").Range("H11:I12").Value = Sheets("RNC1").Range("H11:I12").Value
+ Sheets("RNC2").Range("J12:L12").Value = Sheets("RNC1").Range("J12:L12").Value
+ Sheets("RNC2").Range("D13:F14").Value = Sheets("RNC1").Range("D13:F14").Value
+ Sheets("RNC2").Range("G14:H14").Value = Sheets("RNC1").Range("G14:H14").Value
+ Sheets("RNC2").Range("I14:J14").Value = Sheets("RNC1").Range("I14:J14").Value
+ Sheets("RNC2").Range("K14:L14").Value = Sheets("RNC1").Range("K14:L14").Value
+ Sheets("RNC2").Range("B16:L16").Value = Sheets("RNC1").Range("B16:L16").Value
+ Sheets("RNC2").Range("B18:L18").Value = Sheets("RNC1").Range("B18:L18").Value
+ Sheets("RNC2").Range("C20:L24").Value = Sheets("RNC1").Range("C20:L24").Value
+ Sheets("RNC2").Range("I34:L34").Value = Sheets("RNC1").Range("I34:L34").Value
+ Sheets("RNC2").Range("C39:L43").Value = Sheets("RNC1").Range("C39:L43").Value
+ Sheets("RNC2").Range("E48:J51").Value = Sheets("RNC1").Range("E48:J51").Value
+ Sheets("RNC2").Range("H53:L56").Value = Sheets("RNC1").Range("H53:L56").Value
+ Sheets("RNC2").Range("B58:L59").Value = Sheets("RNC1").Range("B58:L59").Value
+
+ Sheets("Dados1").Range("k7").Value = Sheets("Dados1").Range("k2").Value
+ Sheets("Dados1").Range("M7").Value = Sheets("Dados1").Range("M2").Value
+ Sheets("Dados1").Range("P7:Q7").Value = Sheets("Dados1").Range("P2:Q2").Value
+ Sheets("Dados1").Range("AE7:BE7").Value = Sheets("Dados1").Range("AE2:BE7").Value
+ Sheets("Dados1").Range("BZ7:CA7").Value = Sheets("Dados1").Range("BZ2:CA2").Value
+ Sheets("Dados1").Range("CJ7:CQ7").Value = Sheets("Dados1").Range("CJ2:CQ2").Value
+ Sheets("RNC1").Visible = False
+Módulo2 - 3
+End Sub
+Módulo3 - 1
+'Macro de revisão na planilha "lista"
+'Identifica RNC e exclui a linha
+Sub Salvar_rev()
+
+ If Sheets("dados1").Range("DA2").Value = "y" Then
+ MsgBox ("RNC já validada pela Diretoria. Não é possível alterar. Utilize o botão SAIR SEM SALVAR")
+ Exit Sub
+
+ Else:
+
+ Call Unprotect
+
+ Range("D9:E9").Select
+ Selection.Locked = True
+
+ ActiveSheet.CheckSpelling
+
+ Dim Nrnc As String
+ Nrnc = Sheets("RNC2").Range("L2").Value
+ Sheets("lista").Visible = True
+ Sheets("lista").Select
+ MsgBox DeleteRowsByCriteria(1, 10000, 1, Nrnc) & " Dado atualizado com Sucesso"
+
+ Call subs_linha
+
+ ActiveWorkbook.Save
+
+ Call protect
+ End If
+
+End Sub
+Function DeleteRowsByCriteria(ByVal firstRow As Integer, ByVal lastRow As Integer, ByVal criteriaColumn As Integer, ByVal criteria As String) As Integer
+ Dim deletedRows As Integer
+ Dim i As Integer
+ deletedRows = 0
+ With ActiveSheet
+ i = firstRow
+ While i < lastRow
+ If CStr(.Cells(i, criteriaColumn).Value) = criteria Then
+ .Rows(i).Delete
+ deletedRows = deletedRows + 1
+ Else
+ i = i + 1
+ End If
+ Wend
+ End With
+ DeleteRowsByCriteria = deletedRows
+End Function
+Sub subs_linha()
+' inclui linha na planilha "lista" com dados revisados
+ Sheets("lista").Select
+
+' filtra ordem decrescente
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Clear
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Add Key:=Range( _
+ "A6"), SortOn:=xlSortOnValues, Order:=xlDescending, DataOption:= _
+ xlSortNormal
+ With ActiveWorkbook.Worksheets("lista").AutoFilter.Sort
+ .Header = xlYes
+ .MatchCase = False
+ .Orientation = xlTopToBottom
+ .SortMethod = xlPinYin
+ .Apply
+ End With
+
+'Adiciona 1 linha'
+ Rows("7:7").Select
+ Selection.Insert Shift:=xlDown, CopyOrigin:=xlFormatFromLeftOrAbove
+ Rows("8:8").Select
+ Selection.Copy
+Módulo3 - 2
+ Rows("7:7").Select
+ Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+ SkipBlanks:=False, Transpose:=False
+ Application.CutCopyMode = False
+ Range("A7").Select
+
+'retorna em "dados1", executa rotina causa e copia dados'
+
+ Sheets("Dados1").Visible = True
+ Sheets("Dados1").Select
+
+ Call causa_rev
+
+ Range("A7:DB7").Select
+ Selection.Copy
+
+'Cola valores na Lista e salva"
+ Sheets("lista").Select
+ Range("a7").Select
+ Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
+ :=False, Transpose:=False
+ Application.CutCopyMode = False
+
+ Sheets("Dados1").Visible = False
+ Sheets("RNC2").Visible = False
+ ActiveWorkbook.Save
+
+End Sub
+Sub causa_rev()
+'Rotina para identificar causa fundamental revisada
+
+ Range("AE7:BE8").Select
+ Selection.Copy
+ Range("F18").Select
+ Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
+ :=False, Transpose:=True
+ Application.CutCopyMode = False
+
+ ActiveWorkbook.Worksheets("Dados1").AutoFilter.Sort.SortFields.Clear
+ ActiveWorkbook.Worksheets("Dados1").AutoFilter.Sort.SortFields.Add Key:=Range( _
+ "F17"), SortOn:=xlSortOnValues, Order:=xlAscending, DataOption:= _
+ xlSortNormal
+ With ActiveWorkbook.Worksheets("Dados1").AutoFilter.Sort
+ .Header = xlYes
+ .MatchCase = False
+ .Orientation = xlTopToBottom
+ .SortMethod = xlPinYin
+ .Apply
+ End With
+ Application.CutCopyMode = False
+End Sub
+Módulo4 - 1
+Sub finaliza()
+' Identifica RNC e inclui um X ou Y na coluna DA para registrar RNC finalizado
+
+ If Sheets("Dados1").Range("DA2").Value = "y" Then
+ MsgBox ("RNC já validada pela Diretoria. Não é possível alterar. Utilize o botão SAIR SEM SALVAR")
+ Exit Sub
+
+ Else:
+
+ Call Unprotect
+
+ Range("D9:E9").Select
+ Selection.Locked = True
+
+ Call Salvar_fin
+
+ If Sheets("lista").Range("C1").Value = "Lucas Rodrigues" Then
+ Sheets("lista").Range("DA7").Value = "y"
+
+ ElseIf Sheets("lista").Range("C1").Value = "Eliana Bacellar" Then
+ Sheets("lista").Range("DA7").Value = "y"
+
+ ElseIf Sheets("lista").Range("C1").Value = "Lucia Tavares" Then
+ Sheets("lista").Range("DA7").Value = "y"
+
+ ElseIf Sheets("lista").Range("C1").Value = "Jose Bacellar" Then
+ Sheets("lista").Range("DA7").Value = "y"
+
+ ElseIf Sheets("lista").Range("C1").Value = "Sergio Tavares" Then
+ Sheets("lista").Range("DA7").Value = "y"
+ ElseIf Sheets("lista").Range("C1").Value = "Joao Murta" Then
+ Sheets("lista").Range("DA7").Value = "y"
+
+ Else: Sheets("lista").Range("DA7").Value = "x"
+
+ End If
+
+ Call protect
+ ActiveWorkbook.Save
+
+ End If
+
+End Sub
+'Identifica RNC e exclui a linha
+Sub Salvar_fin()
+
+ Dim Nrnc As String
+ Nrnc = Sheets("RNC2").Range("L2").Value
+ Sheets("lista").Visible = True
+ Sheets("lista").Select
+ MsgBox DeleteRowsByCriteria(1, 10000, 1, Nrnc) & " RNC finalizada com Sucesso"
+ Call subs_linha
+
+End Sub
+Function DeleteRowsByCriteria(ByVal firstRow As Integer, ByVal lastRow As Integer, ByVal criteriaColumn As Integer, ByVal criteria As String) As Integer
+ Dim deletedRows As Integer
+ Dim i As Integer
+ deletedRows = 0
+ With ActiveSheet
+ i = firstRow
+ While i < lastRow
+ If CStr(.Cells(i, criteriaColumn).Value) = criteria Then
+ .Rows(i).Delete
+ deletedRows = deletedRows + 1
+ Else
+ i = i + 1
+ End If
+ Wend
+ End With
+ DeleteRowsByCriteria = deletedRows
+Módulo4 - 2
+End Function
+Módulo5 - 1
+'MÓDULO PARA INDICADORES - GRÁFICOS
+Sub PrintGraf()
+'Salvar gráfico em pdf e abrir arquivo para visualização
+Dim GrafImpr As String
+GrafImpr = Range("G2").Value
+' Setor
+ Sheets("Indic").Select
+ ActiveSheet.ExportAsFixedFormat Type:=xlTypePDF, Filename:="J:\Qua- RNC\Sistema RNC\Indicadores impressos\" & "Gráfico" & "_" & GrafImpr & "_" & Format(Now(), "DD-MMM-YYYY hh mm AMPM") _
+ , Quality:=xlQualityStandard, IncludeDocProperties:=True, IgnorePrintAreas:=False, _
+ OpenAfterPublish:=True
+
+End Sub
+Sub Indicador()
+' abrir relatório gráfico
+ Call Unprotect
+ Sheets("Indic").Visible = True
+ Sheets("lista").Visible = False
+ Sheets("Indic").Select
+
+ Call protect
+
+ Call calc_graf
+End Sub
+Sub Fechar()
+'fechar relatório formulário RNC de Edição sem salvar
+ Call Unprotect
+
+ Range("D9:E9").Select
+ Selection.Locked = True
+
+ Sheets("lista").Visible = True
+ Sheets("lista").Select
+ Sheets("RNC2").Visible = False
+ Range("D3:D4").Select
+
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Clear
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Add Key:=Range( _
+ "A6"), SortOn:=xlSortOnValues, Order:=xlDescending, DataOption:= _
+ xlSortNormal
+ With ActiveWorkbook.Worksheets("lista").AutoFilter.Sort
+ .Header = xlYes
+ .MatchCase = False
+ .Orientation = xlTopToBottom
+ .SortMethod = xlPinYin
+ .Apply
+ End With
+
+ Call protect
+End Sub
+Sub FecharGraf()
+'fechar relatório gráfico
+ Call Unprotect
+ Sheets("lista").Visible = True
+ Sheets("lista").Select
+ Sheets("Indic").Visible = False
+ Call protect
+
+ ActiveWorkbook.Save
+End Sub
+Sub FecharArq()
+Módulo5 - 2
+'Fechar arquivo
+
+ If ActiveWorkbook.ReadOnly = True Then
+
+ ThisWorkbook.NoEvents = True
+ Application.DisplayAlerts = False
+ ThisWorkbook.Close savechanges:=False
+
+ Else:
+ ThisWorkbook.NoEvents = True
+ Application.DisplayAlerts = False
+ ThisWorkbook.Close savechanges:=True
+
+ End If
+End Sub
+Sub calc_graf()
+ ActiveSheet.ChartObjects("Gráfico 4").Visible = False 'apaga gráfico da Qtde RNC por Setor
+ If Sheets("Dgraf").Range("e2").Value = 40 Then
+ Sheets("Dgraf").Range("I4:I33").Value = Sheets("Dgraf").Range("e4:e33").Value
+ Sheets("Dgraf").Range("I38:J38").Value = Sheets("Dgraf").Range("C63:d63").Value
+ Sheets("Dgraf").Range("N37:N62").Value = Sheets("Dgraf").Range("C37:C62").Value
+ ActiveSheet.ChartObjects("Gráfico 4").Visible = True
+
+ ElseIf Sheets("Dgraf").Range("r37").Value = 13 Then
+ Sheets("Dgraf").Range("I4:I33").Value = Sheets("Dgraf").Range("d4:d33").Value
+ Sheets("Dgraf").Range("I38:J38").Value = Sheets("Dgraf").Range("C64:d64").Value
+ Sheets("Dgraf").Range("N37:N62").Value = Sheets("Dgraf").Range("C37:C62").Value
+
+ ElseIf Sheets("Dgraf").Range("j36").Value = 27 Then
+ Sheets("Dgraf").Range("I4:I33").Value = Sheets("Dgraf").Range("f4:f33").Value
+ Sheets("Dgraf").Range("I38:J38").Value = Sheets("Dgraf").Range("e64:f64").Value
+ Sheets("Dgraf").Range("N37:N62").Value = Sheets("Dgraf").Range("e37:e62").Value
+ ActiveSheet.ChartObjects("Gráfico 4").Visible = True
+
+ Else
+ Sheets("Dgraf").Range("I4:I33").Value = Sheets("Dgraf").Range("c4:c33").Value
+ Sheets("Dgraf").Range("I38:J38").Value = Sheets("Dgraf").Range("e64:f64").Value
+ Sheets("Dgraf").Range("N37:N62").Value = Sheets("Dgraf").Range("e37:e62").Value
+
+ End If
+End Sub
+Módulo6 - 1
+Sub enviar_email_edit()
+'rotina para enviar e-mail de edição da RNC
+ Call Unprotect
+
+'coloca planilha em ordem crescente para fucionar o procv em Dados 1
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Clear
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Add Key:=Range( _
+ "A6"), SortOn:=xlSortOnValues, Order:=xlAscending, DataOption:= _
+ xlSortNormal
+ With ActiveWorkbook.Worksheets("lista").AutoFilter.Sort
+ .Header = xlYes
+ .MatchCase = False
+ .Orientation = xlTopToBottom
+ .SortMethod = xlPinYin
+ .Apply
+ End With
+'Gera PDF
+ Call SalvarPDF
+
+ Set objeto_outlook = CreateObject("Outlook.Application")
+ Set Email = objeto_outlook.CreateItem(0)
+ Dim PdfCaminho As String
+ Dim PdfNome As String
+
+ PdfCaminho = "J:\Qua- RNC\Sistema RNC\RNC impresso\"
+ PdfNome = "RNC" & "_" & Sheets("Dados1").Range("a2").Value & ".pdf"
+
+ Sheets("lista").Select
+ Range("f5").Select
+ ActiveCell.Value = PdfCaminho & PdfNome
+
+ Email.display
+
+ On Error GoTo ErrMsg
+
+ Email.Subject = "Relatório de Não Conformidade " & Sheets("Dados1").Range("a2").Value & " " & "foi alterado"
+
+ texto1 = "Olá! "
+ texto2 = "<br><br>O RNC " & Sheets("Dados1").Range("a2").Value & " anexo foi alterado.<br><br>" Email.htmlbody = texto1 & texto2 & Email.htmlbody
+ Email.Attachments.Add Range("f5").Value
+
+ Range("f5").ClearContents
+
+'retorna planilha para ordem decrescente
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Clear
+ ActiveWorkbook.Worksheets("lista").AutoFilter.Sort.SortFields.Add Key:=Range( _
+ "A6"), SortOn:=xlSortOnValues, Order:=xlDescending, DataOption:= _
+ xlSortNormal
+ With ActiveWorkbook.Worksheets("lista").AutoFilter.Sort
+ .Header = xlYes
+ .MatchCase = False
+ .Orientation = xlTopToBottom
+ .SortMethod = xlPinYin
+ .Apply
+ End With
+
+ Call protect
+Exit Sub
+ErrMsg:
+ MsgBox ("ATENÇÃO! ALGO DEU ERRADO")
+ Call protect
+End Sub
+Módulo7 - 1
+Sub enviar_email_graf()
+'rotina para enviar e-mail de edição da RNC
+ Call Unprotect
+ Dim GrafImpr As String
+ GrafImpr = Sheets("Dgraf").Range("k36").Value
+ ' Setor
+ Sheets("Indic").Select
+ ActiveSheet.ExportAsFixedFormat Type:=xlTypePDF, Filename:="J:\Qua- RNC\Sistema RNC\Indicadores impressos\" & "Gráfico" & "_" & GrafImpr _
+ , Quality:=xlQualityStandard, IncludeDocProperties:=True, IgnorePrintAreas:=False, _
+ OpenAfterPublish:=False
+
+ Set objeto_outlook = CreateObject("Outlook.Application")
+ Set Email = objeto_outlook.CreateItem(0)
+ Dim PdfCaminho As String
+ Dim PdfNome As String
+
+ PdfCaminho = "J:\Qua- RNC\Sistema RNC\Indicadores impressos\"
+ PdfNome = "Gráfico" & "_" & Sheets("Dgraf").Range("k36").Value & ".pdf"
+
+ Sheets("Indic").Select
+ Range("a1").Select
+ ActiveCell.Value = PdfCaminho & PdfNome
+
+ Email.display
+
+ On Error GoTo ErrMsg
+
+ Email.Subject = "Relatório de RNC do Dpto " & Sheets("Dgraf").Range("k36").Value & " "
+
+ texto1 = "Olá!<br><br> "
+ texto2 = "O relatório de RNC " & Sheets("Dgraf").Range("k36").Value & " anexo foi emitido. Favor dar as devidas tratativas nas RNC em aberto.<br><br>"
+ Email.htmlbody = texto1 & texto2 & Email.htmlbody
+ Email.Attachments.Add Range("a1").Value
+
+ Range("a1").ClearContents
+
+ Call protect
+Exit Sub
+ErrMsg:
+ MsgBox ("ATENÇÃO! ALGO DEU ERRADO")
+ Call protect
+End Sub
+Módulo8 - 1
+'ESTE MÓDULO É REFERENTE AS ROTINAS AO REPORT GERENCIAL
+Sub Acesso_ger()
+ Senha1 = "1234"
+ Resposta = InputBox("Insira a senha para acessar os gráficos gerenciais")
+ If Resposta <> Senha1 Then
+ MsgBox "Senha Incorreta", , "ACESSO NEGADO"
+ Exit Sub
+ Else
+ Call Gerencial
+ End If
+End Sub
+Sub checkgerencia() 'NÃO ESTOU USANDO
+ 'confirma quem pode acessar o relatório
+
+ If Sheets("lista").Range("C1").Value = "Lucas Rodrigues" Then
+ Call Gerencial
+
+ ElseIf Sheets("lista").Range("C1").Value = "Eliana Bacellar" Then
+ Call Gerencial
+
+ ElseIf Sheets("lista").Range("C1").Value = "Lucia Tavares" Then
+ Call Gerencial
+
+ ElseIf Sheets("lista").Range("C1").Value = "Jose Bacellar" Then
+ Call Gerencial
+
+ ElseIf Sheets("lista").Range("C1").Value = "Sergio Tavares" Then
+ Call Gerencial
+ ElseIf Sheets("lista").Range("C1").Value = "Joao Murta" Then
+ Call Gerencial
+
+ ElseIf Sheets("lista").Range("C1").Value = "Thiago Be" Then
+ Call Gerencial
+
+ ElseIf Sheets("lista").Range("C1").Value = "Fabio Kiyohashi" Then
+ Call Gerencial
+
+ ElseIf Sheets("lista").Range("C1").Value = "William Rosas" Then
+ Call Gerencial
+ Else:
+ MsgBox ("VOCÊ NÃO TEM AUTORIZAÇÃO PARA ACESSAR ESSA TELA")
+
+ End If
+
+End Sub
+Sub UnprotectGerencial()
+ 'Desbloquear planilha de gráficos gerenciais
+
+ If ActiveWorkbook.ReadOnly = True Then
+
+ MsgBox "NÃO É POSSÍVEL DESPROTEGER POIS ARQUIVO É SOMENTE LEITURA. FECHE O ARQUIVO E ABRA NOVAMENTE."
+
+ Else
+
+ ActiveSheet.Unprotect ("PJ")
+
+ Sheets("Gerencial").Range("L16:N17").Value = "PLANILHA DESBLOQUEADA!"
+
+ End If
+End Sub
+Módulo8 - 2
+Sub Gerencial()
+' abrir relatório gráfico gerencial
+
+ Call Unprotect
+ Sheets("Gerencial").Visible = True
+ Sheets("Indic").Visible = False
+ Sheets("Gerencial").Select
+
+ Call AtualGrafGerenc
+
+ Call protect
+End Sub
+Sub FecharGrafGerenc()
+'fechar relatório gráfico gerencial
+ Call Unprotect
+ Sheets("Indic").Visible = True
+ Sheets("Gerencial").Visible = False
+ Sheets("Indic").Select
+ Call protect
+
+ Sheets("Gerencial").Range("L16:N17").ClearContents
+
+ ActiveWorkbook.Save
+End Sub
+Sub AtualGrafGerenc()
+'
+' Atualiza tabela dinâmica dos gráficos gerenciais
+ ActiveSheet.PivotTables("Tabela dinâmica2").PivotCache.Refresh
+ ActiveSheet.PivotTables("Tabela dinâmica2").PivotFields( _
+ "Responsável pela causa da não conformidade - nome").AutoSort xlDescending, _
+ "Contagem de Responsável pela causa da não conformidade - nome"
+
+ ActiveSheet.PivotTables("Tabela dinâmica4").PivotFields( _
+ "Responsável pela causa da não conformidade - nome").AutoSort xlDescending, _
+ "Soma de Total"
+ ActiveSheet.PivotTables("Tabela dinâmica1").PivotCache.Refresh
+End Sub
+
+Sub enviar_email_graf_gerenc()
+'rotina para enviar e-mail de edição da RNC
+ Call Unprotect
+ Sheets("Gerencial").Select
+ ActiveSheet.ExportAsFixedFormat Type:=xlTypePDF, Filename:="J:\Qua- RNC\Sistema RNC\Indicadores impressos\" & "Gráfico" & "_" & "gerencial" _
+ , Quality:=xlQualityStandard, IncludeDocProperties:=True, IgnorePrintAreas:=False, _
+ OpenAfterPublish:=False
+
+ Set objeto_outlook = CreateObject("Outlook.Application")
+ Set Email = objeto_outlook.CreateItem(0)
+ Dim PdfCaminho1 As String
+ Dim PdfNome2 As String
+
+ PdfCaminho1 = "J:\Qua- RNC\Sistema RNC\Indicadores impressos\"
+ PdfNome2 = "Gráfico" & "_" & "gerencial.pdf"
+
+ Sheets("Gerencial").Select
+ Range("a1").Select
+ ActiveCell.Value = PdfCaminho1 & PdfNome2
+
+ Email.display
+
+ On Error GoTo ErrMsg
+
+ Email.Subject = "Relatório Gerencial de RNC"
+
+Módulo8 - 3
+ texto1 = "Olá!<br><br> "
+ texto2 = "O relatório gerencial anexo foi emitido.<br><br>"
+ Email.htmlbody = texto1 & texto2 & Email.htmlbody
+ Email.Attachments.Add Range("a1").Value
+
+ Range("a1").ClearContents
+
+ Call protect
+Exit Sub
+ErrMsg:
+ MsgBox ("ATENÇÃO! ALGO DEU ERRADO")
+ Call protect
+End Sub
+
+Sub graf_remar()
+' ATUALIZA GRÁFICO REMAR
+ Sheets("Dgraf").Range("R4:S32").Value = Sheets("Dgraf").Range("O4:P32").Value
+
+ ActiveWorkbook.Worksheets("Dgraf").AutoFilter.Sort.SortFields.Clear
+ ActiveWorkbook.Worksheets("Dgraf").AutoFilter.Sort.SortFields.Add Key:=Range( _
+ "S3"), SortOn:=xlSortOnValues, Order:=xlDescending, DataOption:= _
+ xlSortNormal
+ With ActiveWorkbook.Worksheets("Dgraf").AutoFilter.Sort
+ .Header = xlYes
+ .MatchCase = False
+ .Orientation = xlTopToBottom
+ .SortMethod = xlPinYin
+ .Apply
+ End With
+End Sub
+Módulo9 - 1
+'MÓDULO PARA AS ROTINAS DE ENTRADA DE CUSTOS
+Sub custos()
+'Abre planilha Custo
+ If ActiveWorkbook.ReadOnly = True Then
+
+ MsgBox "NÃO É POSSÍVEL ATUALIZAR OS CUSTOS POIS ARQUIVO É SOMENTE LEITURA. FECHE O ARQUIVO E ABRA NOVAMENTE."
+
+ Else
+
+ Call Unprotect
+ Sheets("custo").Visible = True
+ Sheets("custo").Select
+ Sheets("gerencial").Visible = False
+ Call protect
+
+ End If
+
+End Sub
+Sub fecha_custos()
+'Feca planilha Custos
+ Call Unprotect
+ Sheets("gerencial").Visible = True
+ Sheets("gerencial").Select
+ Sheets("custo").Visible = False
+ Call protect
+
+End Sub
+Sub limpar_custos()
+'
+' limpar_custos
+
+ Call Unprotect
+
+ Range("B5:C5").Select
+ Range(Selection, Selection.End(xlDown)).Select
+ Selection.ClearContents
+
+ ActiveSheet.PivotTables("Tabela dinâmica1").PivotCache.Refresh
+
+ Range("B5").Select
+
+End Sub
+Sub atualiza_custos()
+ Call Unprotect
+
+ 'atualiza tabla dinâmica 1 (filtro do mês)
+ ActiveSheet.PivotTables("Tabela dinâmica1").PivotCache.Refresh
+ 'Copia filtro valor x RNC mensal e cola no histórico RNC x Valor
+ Range("I5:J5").Select
+ Range(Selection, Selection.End(xlDown).Offset(-2, 0)).Select
+ Selection.Copy
+
+
+ Range("L1048576").End(xlUp).Offset(1, 0).Select
+ Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlAdd, SkipBlanks _
+ :=False, Transpose:=False
+ Application.CutCopyMode = False
+ 'Atualiza filtro de todas RNC
+ ActiveSheet.PivotTables("Tabela dinâmica2").PivotCache.Refresh
+ ActiveSheet.PivotTables("Tabela dinâmica2").PivotFields("RNC").AutoSort _
+ xlAscending, "RNC"
+ Range("B5").Select
+Módulo9 - 2
+ 'atualiza os custos na lista.
+
+ Sheets("lista").Visible = True
+ Sheets("lista").Select
+ Range("CX7").Select
+ ActiveCell.FormulaR1C1 = "=VLOOKUP(RC[-101],Custo!R5C[-87]:R10000C[-86],2,0)"
+ Selection.Copy
+ Range("CX8").Select
+ Range(Selection, Selection.End(xlDown)).Select
+ Selection.PasteSpecial Paste:=xlPasteFormulas, Operation:=xlNone, _
+ SkipBlanks:=False, Transpose:=False
+
+ Application.CutCopyMode = False
+ Sheets("lista").Visible = False
+ Sheets("custo").Select
+ MsgBox ("Atualização de custos feita com sucesso")
+
+ Call protect
+
+ ActiveWorkbook.Save
+End Sub
